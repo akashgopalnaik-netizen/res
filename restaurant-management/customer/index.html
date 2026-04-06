@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Customer - RestoManager</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<nav class="navbar">
+  <h1>🍽️ RestoManager</h1>
+  <div class="nav-right">
+    <span id="custName"></span>
+    <button class="btn-logout" onclick="logout()">Logout</button>
+  </div>
+</nav>
+
+<div class="layout">
+  <div class="sidebar">
+    <a href="#" class="active" onclick="showSection('restaurants', this)"><span class="icon">🏪</span>Restaurants</a>
+    <a href="#" onclick="showSection('orders', this)"><span class="icon">📋</span>My Orders</a>
+    <a href="#" onclick="showSection('profile', this)"><span class="icon">👤</span>Profile</a>
+  </div>
+
+  <div class="main" id="mainContent">
+    <!-- Restaurants -->
+    <div id="sec-restaurants">
+      <div class="section-header"><h2>Browse Restaurants</h2>
+        <input id="searchInput" placeholder="Search restaurants..." style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem" oninput="renderRestaurants()"/>
+      </div>
+      <div class="resto-grid" id="restoGrid"></div>
+    </div>
+
+    <!-- Menu view -->
+    <div id="sec-menu" style="display:none">
+      <div class="section-header">
+        <div>
+          <button class="btn btn-sm" onclick="showSection('restaurants', document.querySelector('.sidebar a'))" style="margin-bottom:8px">← Back</button>
+          <h2 id="menuRestaurantName"></h2>
+        </div>
+        <select id="categoryFilter" onchange="renderMenuItems()" class="btn">
+          <option value="">All Categories</option>
+        </select>
+      </div>
+      <div class="menu-grid" id="menuGrid"></div>
+    </div>
+
+    <!-- Orders -->
+    <div id="sec-orders" style="display:none">
+      <div class="section-header"><h2>My Orders</h2></div>
+      <div id="ordersList"></div>
+    </div>
+
+    <!-- Profile -->
+    <div id="sec-profile" style="display:none">
+      <div class="section-header"><h2>My Profile</h2></div>
+      <div class="card" style="max-width:420px">
+        <div class="form-group"><label>Name</label><input id="profName"/></div>
+        <div class="form-group"><label>Email</label><input id="profEmail"/></div>
+        <div class="form-group"><label>New Password</label><input type="password" id="profPassword" placeholder="Leave blank to keep current"/></div>
+        <button class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Cart Panel -->
+<div class="cart-panel" id="cartPanel">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h3>🛒 Cart</h3>
+    <button onclick="toggleCart()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+  </div>
+  <div id="cartRestaurant" style="font-size:0.85rem;color:#888;margin-bottom:12px"></div>
+  <div id="cartItems"></div>
+  <div id="cartTotal" style="font-weight:700;font-size:1.1rem;margin:16px 0;padding-top:12px;border-top:1px solid #eee"></div>
+  <button class="btn btn-success" style="width:100%" onclick="placeOrder()">Place Order</button>
+  <button class="btn btn-danger" style="width:100%;margin-top:8px" onclick="clearCartUI()">Clear Cart</button>
+</div>
+
+<button class="cart-toggle" onclick="toggleCart()" id="cartBtn">🛒 Cart <span id="cartCount">0</span></button>
+
+<!-- Order Detail Modal -->
+<div class="modal-overlay" id="orderModal">
+  <div class="modal">
+    <h3>Order Details</h3>
+    <div id="orderDetail"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeModal('orderModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="../js/app.js"></script>
+<script>
+  const user = requireAuth('customer');
+  let currentRestaurantId = null;
+
+  if (user) document.getElementById('custName').textContent = user.name;
+
+  function showSection(name, el) {
+    document.querySelectorAll('.main > div').forEach(d => d.style.display = 'none');
+    document.getElementById('sec-' + name).style.display = 'block';
+    document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
+    if (el) el.classList.add('active');
+    renders[name] && renders[name]();
+  }
+
+  const renders = { restaurants: renderRestaurants, orders: renderMyOrders, profile: renderProfile };
+
+  function renderRestaurants() {
+    const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
+    const active = DB.restaurants.filter(r => r.status === 'active' && (r.name.toLowerCase().includes(q) || r.cuisine.toLowerCase().includes(q)));
+    document.getElementById('restoGrid').innerHTML = active.length ? active.map(r =>
+      `<div class="resto-card" onclick="openMenu(${r.id})">
+        <div class="emoji">${r.image}</div>
+        <h3>${r.name}</h3>
+        <div class="cuisine">${r.cuisine}</div>
+        <div class="rating">${r.rating > 0 ? '⭐ ' + r.rating : 'New'}</div>
+        <div style="font-size:0.8rem;color:#aaa;margin-top:6px">${r.address}</div>
+      </div>`
+    ).join('') : '<p style="color:#aaa;padding:20px">No restaurants found.</p>';
+  }
+
+  function openMenu(restaurantId) {
+    currentRestaurantId = restaurantId;
+    const resto = DB.restaurants.find(r => r.id === restaurantId);
+    document.getElementById('menuRestaurantName').textContent = `${resto.image} ${resto.name}`;
+    document.querySelectorAll('.main > div').forEach(d => d.style.display = 'none');
+    document.getElementById('sec-menu').style.display = 'block';
+
+    const items = DB.menus.filter(m => m.restaurantId === restaurantId);
+    const cats = [...new Set(items.map(m => m.category))];
+    const catFilter = document.getElementById('categoryFilter');
+    catFilter.innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option>${c}</option>`).join('');
+    renderMenuItems();
+  }
+
+  function renderMenuItems() {
+    const cat = document.getElementById('categoryFilter').value;
+    let items = DB.menus.filter(m => m.restaurantId === currentRestaurantId);
+    if (cat) items = items.filter(m => m.category === cat);
+    document.getElementById('menuGrid').innerHTML = items.length ? items.map(m =>
+      `<div class="menu-card">
+        <div class="emoji">${m.image}</div>
+        <h4>${m.name}</h4>
+        <div style="font-size:0.8rem;color:#888;margin-bottom:6px">${m.category}</div>
+        <div class="price">$${m.price.toFixed(2)}</div>
+        ${m.available
+          ? `<button class="btn btn-primary btn-sm" onclick="addItem(${m.id})">Add to Cart</button>`
+          : `<span class="unavailable">Currently unavailable</span>`}
+      </div>`
+    ).join('') : '<p style="color:#aaa;padding:20px">No items in this category.</p>';
+  }
+
+  function addItem(menuId) {
+    const cart = getCart();
+    if (cart.length > 0) {
+      const firstItem = DB.menus.find(m => m.id === cart[0].menuId);
+      if (firstItem && firstItem.restaurantId !== currentRestaurantId) {
+        if (!confirm('Your cart has items from another restaurant. Clear and add this item?')) return;
+        clearCart();
+      }
+    }
+    const item = DB.menus.find(m => m.id === menuId);
+    addToCart({ menuId, name: item.name, price: item.price, image: item.image });
+    updateCartUI();
+    showToast(`${item.name} added to cart`);
+  }
+
+  function updateCartUI() {
+    const cart = getCart();
+    document.getElementById('cartCount').textContent = cart.reduce((s, i) => s + i.qty, 0);
+    if (!cart.length) {
+      document.getElementById('cartItems').innerHTML = '<p style="color:#aaa;text-align:center;padding:20px">Cart is empty</p>';
+      document.getElementById('cartTotal').textContent = '';
+      document.getElementById('cartRestaurant').textContent = '';
+      return;
+    }
+    const firstItem = DB.menus.find(m => m.id === cart[0].menuId);
+    const resto = firstItem ? DB.restaurants.find(r => r.id === firstItem.restaurantId) : null;
+    document.getElementById('cartRestaurant').textContent = resto ? `From: ${resto.name}` : '';
+    document.getElementById('cartItems').innerHTML = cart.map(c =>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0">
+        <div>${c.image} ${c.name}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button onclick="changeQty(${c.menuId}, -1)" class="btn btn-sm" style="padding:2px 8px">-</button>
+          <span>${c.qty}</span>
+          <button onclick="changeQty(${c.menuId}, 1)" class="btn btn-sm" style="padding:2px 8px">+</button>
+          <span style="min-width:55px;text-align:right">$${(c.price * c.qty).toFixed(2)}</span>
+          <button onclick="removeItem(${c.menuId})" class="btn btn-danger btn-sm" style="padding:2px 8px">✕</button>
+        </div>
+      </div>`
+    ).join('');
+    const total = cart.reduce((s, c) => s + c.price * c.qty, 0);
+    document.getElementById('cartTotal').textContent = `Total: $${total.toFixed(2)}`;
+  }
+
+  function changeQty(menuId, delta) {
+    const cart = getCart();
+    const item = cart.find(c => c.menuId === menuId);
+    if (item) {
+      item.qty += delta;
+      if (item.qty <= 0) saveCart(cart.filter(c => c.menuId !== menuId));
+      else saveCart(cart);
+    }
+    updateCartUI();
+  }
+
+  function removeItem(menuId) { removeFromCart(menuId); updateCartUI(); }
+  function clearCartUI() { clearCart(); updateCartUI(); showToast('Cart cleared'); }
+  function toggleCart() { document.getElementById('cartPanel').classList.toggle('open'); }
+
+  function placeOrder() {
+    const cart = getCart();
+    if (!cart.length) return showToast('Cart is empty');
+    const firstItem = DB.menus.find(m => m.id === cart[0].menuId);
+    const restaurantId = firstItem.restaurantId;
+    const total = cart.reduce((s, c) => s + c.price * c.qty, 0);
+    const order = {
+      id: DB.nextId.orders++,
+      customerId: user.id,
+      restaurantId,
+      items: cart.map(c => ({ menuId: c.menuId, qty: c.qty })),
+      status: 'pending',
+      total: parseFloat(total.toFixed(2)),
+      date: new Date().toISOString().split('T')[0]
+    };
+    DB.orders.push(order);
+    saveDB(); clearCart(); updateCartUI();
+    document.getElementById('cartPanel').classList.remove('open');
+    showToast('Order placed successfully!');
+  }
+
+  function renderMyOrders() {
+    const myOrders = DB.orders.filter(o => o.customerId === user.id).reverse();
+    document.getElementById('ordersList').innerHTML = myOrders.length ? myOrders.map(o => {
+      const resto = DB.restaurants.find(r => r.id === o.restaurantId);
+      const items = o.items.map(i => {
+        const m = DB.menus.find(x => x.id === i.menuId);
+        return m ? `${m.image} ${m.name} x${i.qty}` : `Item x${i.qty}`;
+      }).join(', ');
+      return `<div class="card" style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <strong>#${o.id} — ${resto?.name || 'Unknown'}</strong>
+            <div style="font-size:0.85rem;color:#888;margin:6px 0">${items}</div>
+            <div style="font-size:0.82rem;color:#aaa">${o.date}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:700;color:#27ae60;margin-bottom:6px">$${o.total.toFixed(2)}</div>
+            <span class="badge ${statusBadge(o.status)}">${o.status}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('') : '<div class="card"><p style="color:#aaa;text-align:center;padding:20px">No orders yet. Start browsing restaurants!</p></div>';
+  }
+
+  function renderProfile() {
+    document.getElementById('profName').value = user.name;
+    document.getElementById('profEmail').value = user.email;
+  }
+
+  function saveProfile() {
+    const u = DB.users.find(x => x.id === user.id);
+    u.name = document.getElementById('profName').value;
+    u.email = document.getElementById('profEmail').value;
+    const pw = document.getElementById('profPassword').value;
+    if (pw) u.password = pw;
+    sessionStorage.setItem('currentUser', JSON.stringify(u));
+    saveDB(); showToast('Profile updated');
+  }
+
+  function statusBadge(s) {
+    return {pending:'badge-warning',preparing:'badge-info',ready:'badge-warning',delivered:'badge-success',cancelled:'badge-danger'}[s]||'badge-info';
+  }
+
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  renderRestaurants();
+  updateCartUI();
+</script>
+</body>
+</html>

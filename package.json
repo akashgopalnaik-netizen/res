@@ -1,0 +1,15 @@
+{
+  "name": "restaurant-management-app",
+  "version": "1.0.0",
+  "description": "Complete restaurant management system with POS, online ordering, and payment gateway",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\" \"npm run admin\"",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm run dev",
+    "admin": "cd admin && npm run dev",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install && cd ../admin && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

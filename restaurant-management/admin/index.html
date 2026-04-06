@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Panel - RestoManager</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<nav class="navbar">
+  <h1>🍽️ RestoManager — Admin Panel</h1>
+  <div class="nav-right">
+    <span id="adminName"></span>
+    <button class="btn-logout" onclick="logout()">Logout</button>
+  </div>
+</nav>
+
+<div class="layout">
+  <div class="sidebar">
+    <a href="#" class="active" onclick="showSection('dashboard', this)"><span class="icon">📊</span>Dashboard</a>
+    <a href="#" onclick="showSection('restaurants', this)"><span class="icon">🏪</span>Restaurants</a>
+    <a href="#" onclick="showSection('users', this)"><span class="icon">👥</span>Users</a>
+    <a href="#" onclick="showSection('orders', this)"><span class="icon">📋</span>All Orders</a>
+  </div>
+
+  <div class="main">
+    <!-- Dashboard -->
+    <div id="sec-dashboard">
+      <div class="stats-grid" id="statsGrid"></div>
+      <div class="card">
+        <h2>Recent Orders</h2>
+        <table><thead><tr><th>#</th><th>Customer</th><th>Restaurant</th><th>Total</th><th>Status</th><th>Date</th></tr></thead>
+        <tbody id="recentOrders"></tbody></table>
+      </div>
+    </div>
+
+    <!-- Restaurants -->
+    <div id="sec-restaurants" style="display:none">
+      <div class="section-header">
+        <h2>Restaurants</h2>
+        <button class="btn btn-primary" onclick="openRestoModal()">+ Add Restaurant</button>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>Name</th><th>Cuisine</th><th>Address</th><th>Status</th><th>Rating</th><th>Actions</th></tr></thead>
+        <tbody id="restoTable"></tbody></table>
+      </div>
+    </div>
+
+    <!-- Users -->
+    <div id="sec-users" style="display:none">
+      <div class="section-header">
+        <h2>Users</h2>
+        <button class="btn btn-primary" onclick="openUserModal()">+ Add User</button>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Actions</th></tr></thead>
+        <tbody id="usersTable"></tbody></table>
+      </div>
+    </div>
+
+    <!-- Orders -->
+    <div id="sec-orders" style="display:none">
+      <div class="section-header"><h2>All Orders</h2></div>
+      <div class="card">
+        <table><thead><tr><th>#</th><th>Customer</th><th>Restaurant</th><th>Items</th><th>Total</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+        <tbody id="ordersTable"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Restaurant Modal -->
+<div class="modal-overlay" id="restoModal">
+  <div class="modal">
+    <h3 id="restoModalTitle">Add Restaurant</h3>
+    <input type="hidden" id="restoId"/>
+    <div class="form-row">
+      <div class="form-group"><label>Name</label><input id="restoName" placeholder="Restaurant name"/></div>
+      <div class="form-group"><label>Cuisine</label><input id="restoCuisine" placeholder="e.g. Italian"/></div>
+    </div>
+    <div class="form-group"><label>Address</label><input id="restoAddress" placeholder="Full address"/></div>
+    <div class="form-row">
+      <div class="form-group"><label>Status</label>
+        <select id="restoStatus"><option value="active">Active</option><option value="pending">Pending</option><option value="inactive">Inactive</option></select>
+      </div>
+      <div class="form-group"><label>Emoji Icon</label><input id="restoImage" placeholder="e.g. 🍕"/></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('restoModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRestaurant()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- User Modal -->
+<div class="modal-overlay" id="userModal">
+  <div class="modal">
+    <h3 id="userModalTitle">Add User</h3>
+    <input type="hidden" id="userId"/>
+    <div class="form-row">
+      <div class="form-group"><label>Name</label><input id="userName" placeholder="Full name"/></div>
+      <div class="form-group"><label>Email</label><input id="userEmail" placeholder="Email"/></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Password</label><input type="password" id="userPassword" placeholder="Password"/></div>
+      <div class="form-group"><label>Role</label>
+        <select id="userRole"><option value="customer">Customer</option><option value="manager">Manager</option><option value="admin">Admin</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('userModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveUser()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="../js/app.js"></script>
+<script>
+  const user = requireAuth('admin');
+  if (user) document.getElementById('adminName').textContent = user.name;
+
+  function showSection(name, el) {
+    document.querySelectorAll('.main > div').forEach(d => d.style.display = 'none');
+    document.getElementById('sec-' + name).style.display = 'block';
+    document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
+    el.classList.add('active');
+    renders[name]();
+  }
+
+  const renders = {
+    dashboard: renderDashboard,
+    restaurants: renderRestaurants,
+    users: renderUsers,
+    orders: renderAllOrders
+  };
+
+  function renderDashboard() {
+    const stats = [
+      { label: 'Restaurants', number: DB.restaurants.length, icon: '🏪' },
+      { label: 'Users', number: DB.users.length, icon: '👥' },
+      { label: 'Orders', number: DB.orders.length, icon: '📋' },
+      { label: 'Revenue', number: '$' + DB.orders.reduce((s, o) => s + o.total, 0).toFixed(2), icon: '💰' }
+    ];
+    document.getElementById('statsGrid').innerHTML = stats.map(s =>
+      `<div class="stat-card"><div class="number">${s.number}</div><div class="label">${s.icon} ${s.label}</div></div>`
+    ).join('');
+    document.getElementById('recentOrders').innerHTML = DB.orders.slice(-5).reverse().map(o => {
+      const cust = DB.users.find(u => u.id === o.customerId);
+      const rest = DB.restaurants.find(r => r.id === o.restaurantId);
+      return `<tr><td>#${o.id}</td><td>${cust?.name||'?'}</td><td>${rest?.name||'?'}</td><td>$${o.total.toFixed(2)}</td>
+        <td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td><td>${o.date}</td></tr>`;
+    }).join('');
+  }
+
+  function renderRestaurants() {
+    document.getElementById('restoTable').innerHTML = DB.restaurants.map(r =>
+      `<tr><td>${r.image} ${r.name}</td><td>${r.cuisine}</td><td>${r.address}</td>
+       <td><span class="badge ${r.status==='active'?'badge-success':r.status==='pending'?'badge-warning':'badge-danger'}">${r.status}</span></td>
+       <td>${r.rating > 0 ? '⭐ ' + r.rating : 'N/A'}</td>
+       <td><button class="btn btn-warning btn-sm" onclick="editRestaurant(${r.id})">Edit</button>
+           <button class="btn btn-danger btn-sm" onclick="deleteRestaurant(${r.id})">Delete</button></td></tr>`
+    ).join('');
+  }
+
+  function renderUsers() {
+    document.getElementById('usersTable').innerHTML = DB.users.map(u =>
+      `<tr><td>${u.name}</td><td>${u.email}</td>
+       <td><span class="badge ${u.role==='admin'?'badge-danger':u.role==='manager'?'badge-warning':'badge-info'}">${u.role}</span></td>
+       <td><button class="btn btn-warning btn-sm" onclick="editUser(${u.id})">Edit</button>
+           <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">Delete</button></td></tr>`
+    ).join('');
+  }
+
+  function renderAllOrders() {
+    document.getElementById('ordersTable').innerHTML = DB.orders.map(o => {
+      const cust = DB.users.find(u => u.id === o.customerId);
+      const rest = DB.restaurants.find(r => r.id === o.restaurantId);
+      const itemCount = o.items.reduce((s, i) => s + i.qty, 0);
+      return `<tr><td>#${o.id}</td><td>${cust?.name||'?'}</td><td>${rest?.name||'?'}</td>
+        <td>${itemCount} item(s)</td><td>$${o.total.toFixed(2)}</td>
+        <td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td>
+        <td>${o.date}</td>
+        <td><select onchange="updateOrderStatus(${o.id}, this.value)" class="btn btn-sm">
+          ${['pending','preparing','ready','delivered','cancelled'].map(s =>
+            `<option value="${s}" ${o.status===s?'selected':''}>${s}</option>`).join('')}
+        </select></td></tr>`;
+    }).join('');
+  }
+
+  function statusBadge(s) {
+    return {pending:'badge-warning',preparing:'badge-info',ready:'badge-warning',delivered:'badge-success',cancelled:'badge-danger'}[s]||'badge-info';
+  }
+
+  // Restaurant CRUD
+  function openRestoModal(id) {
+    document.getElementById('restoModalTitle').textContent = id ? 'Edit Restaurant' : 'Add Restaurant';
+    document.getElementById('restoId').value = id || '';
+    if (id) {
+      const r = DB.restaurants.find(x => x.id === id);
+      document.getElementById('restoName').value = r.name;
+      document.getElementById('restoCuisine').value = r.cuisine;
+      document.getElementById('restoAddress').value = r.address;
+      document.getElementById('restoStatus').value = r.status;
+      document.getElementById('restoImage').value = r.image;
+    } else {
+      ['restoName','restoCuisine','restoAddress','restoImage'].forEach(f => document.getElementById(f).value = '');
+      document.getElementById('restoStatus').value = 'active';
+    }
+    document.getElementById('restoModal').classList.add('open');
+  }
+
+  function saveRestaurant() {
+    const id = document.getElementById('restoId').value;
+    const data = {
+      name: document.getElementById('restoName').value,
+      cuisine: document.getElementById('restoCuisine').value,
+      address: document.getElementById('restoAddress').value,
+      status: document.getElementById('restoStatus').value,
+      image: document.getElementById('restoImage').value || '🍽️'
+    };
+    if (!data.name) return showToast('Name is required');
+    if (id) {
+      const r = DB.restaurants.find(x => x.id === parseInt(id));
+      Object.assign(r, data);
+    } else {
+      DB.restaurants.push({ id: DB.nextId.restaurants++, rating: 0, ...data });
+    }
+    saveDB(); closeModal('restoModal'); renderRestaurants(); showToast('Restaurant saved');
+  }
+
+  function editRestaurant(id) { openRestoModal(id); }
+  function deleteRestaurant(id) {
+    if (!confirm('Delete this restaurant?')) return;
+    DB.restaurants = DB.restaurants.filter(r => r.id !== id);
+    saveDB(); renderRestaurants(); showToast('Deleted');
+  }
+
+  // User CRUD
+  function openUserModal(id) {
+    document.getElementById('userModalTitle').textContent = id ? 'Edit User' : 'Add User';
+    document.getElementById('userId').value = id || '';
+    if (id) {
+      const u = DB.users.find(x => x.id === id);
+      document.getElementById('userName').value = u.name;
+      document.getElementById('userEmail').value = u.email;
+      document.getElementById('userRole').value = u.role;
+      document.getElementById('userPassword').value = '';
+    } else {
+      ['userName','userEmail','userPassword'].forEach(f => document.getElementById(f).value = '');
+    }
+    document.getElementById('userModal').classList.add('open');
+  }
+
+  function saveUser() {
+    const id = document.getElementById('userId').value;
+    const data = {
+      name: document.getElementById('userName').value,
+      email: document.getElementById('userEmail').value,
+      role: document.getElementById('userRole').value,
+      password: document.getElementById('userPassword').value
+    };
+    if (!data.name || !data.email) return showToast('Name and email required');
+    if (id) {
+      const u = DB.users.find(x => x.id === parseInt(id));
+      Object.assign(u, data.password ? data : { name: data.name, email: data.email, role: data.role });
+    } else {
+      if (!data.password) return showToast('Password required');
+      DB.users.push({ id: DB.nextId.users++, ...data });
+    }
+    saveDB(); closeModal('userModal'); renderUsers(); showToast('User saved');
+  }
+
+  function editUser(id) { openUserModal(id); }
+  function deleteUser(id) {
+    if (!confirm('Delete this user?')) return;
+    DB.users = DB.users.filter(u => u.id !== id);
+    saveDB(); renderUsers(); showToast('Deleted');
+  }
+
+  function updateOrderStatus(id, status) {
+    const o = DB.orders.find(x => x.id === id);
+    if (o) { o.status = status; saveDB(); showToast('Status updated'); }
+  }
+
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  renderDashboard();
+</script>
+</body>
+</html>

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Manager Panel - RestoManager</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<nav class="navbar">
+  <h1>🍽️ RestoManager — Manager Panel</h1>
+  <div class="nav-right">
+    <span id="managerName"></span>
+    <button class="btn-logout" onclick="logout()">Logout</button>
+  </div>
+</nav>
+
+<div class="layout">
+  <div class="sidebar">
+    <a href="#" class="active" onclick="showSection('dashboard', this)"><span class="icon">📊</span>Dashboard</a>
+    <a href="#" onclick="showSection('menu', this)"><span class="icon">🍽️</span>Menu</a>
+    <a href="#" onclick="showSection('orders', this)"><span class="icon">📋</span>Orders</a>
+    <a href="#" onclick="showSection('profile', this)"><span class="icon">🏪</span>Restaurant Info</a>
+  </div>
+
+  <div class="main">
+    <!-- Dashboard -->
+    <div id="sec-dashboard">
+      <div class="stats-grid" id="mgStatsGrid"></div>
+      <div class="card">
+        <h2>Today's Orders</h2>
+        <table><thead><tr><th>#</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody id="todayOrders"></tbody></table>
+      </div>
+    </div>
+
+    <!-- Menu -->
+    <div id="sec-menu" style="display:none">
+      <div class="section-header">
+        <h2>Menu Items</h2>
+        <button class="btn btn-primary" onclick="openMenuModal()">+ Add Item</button>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>Item</th><th>Category</th><th>Price</th><th>Available</th><th>Actions</th></tr></thead>
+        <tbody id="menuTable"></tbody></table>
+      </div>
+    </div>
+
+    <!-- Orders -->
+    <div id="sec-orders" style="display:none">
+      <div class="section-header"><h2>All Orders</h2>
+        <select id="orderFilter" onchange="renderOrders()" class="btn">
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="preparing">Preparing</option>
+          <option value="ready">Ready</option>
+          <option value="delivered">Delivered</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>#</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+        <tbody id="ordersTable"></tbody></table>
+      </div>
+    </div>
+
+    <!-- Profile -->
+    <div id="sec-profile" style="display:none">
+      <div class="section-header"><h2>Restaurant Information</h2></div>
+      <div class="card" style="max-width:500px">
+        <div class="form-group"><label>Restaurant Name</label><input id="profName"/></div>
+        <div class="form-group"><label>Cuisine Type</label><input id="profCuisine"/></div>
+        <div class="form-group"><label>Address</label><input id="profAddress"/></div>
+        <div class="form-group"><label>Status</label>
+          <select id="profStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select>
+        </div>
+        <button class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Menu Modal -->
+<div class="modal-overlay" id="menuModal">
+  <div class="modal">
+    <h3 id="menuModalTitle">Add Menu Item</h3>
+    <input type="hidden" id="menuItemId"/>
+    <div class="form-row">
+      <div class="form-group"><label>Name</label><input id="menuName" placeholder="Item name"/></div>
+      <div class="form-group"><label>Category</label>
+        <select id="menuCategory">
+          <option>Starter</option><option>Main</option><option>Dessert</option><option>Drinks</option><option>Bread</option><option>Sides</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Price ($)</label><input type="number" id="menuPrice" placeholder="0.00" step="0.01"/></div>
+      <div class="form-group"><label>Emoji Icon</label><input id="menuImage" placeholder="e.g. 🍕"/></div>
+    </div>
+    <div class="form-group">
+      <label><input type="checkbox" id="menuAvailable" checked/> Available</label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('menuModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMenuItem()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="../js/app.js"></script>
+<script>
+  const user = requireAuth('manager');
+  let myRestaurant = null;
+
+  if (user) {
+    document.getElementById('managerName').textContent = user.name;
+    myRestaurant = DB.restaurants.find(r => r.id === user.restaurantId) || DB.restaurants[0];
+  }
+
+  function showSection(name, el) {
+    document.querySelectorAll('.main > div').forEach(d => d.style.display = 'none');
+    document.getElementById('sec-' + name).style.display = 'block';
+    document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
+    el.classList.add('active');
+    renders[name]();
+  }
+
+  const renders = { dashboard: renderDashboard, menu: renderMenu, orders: renderOrders, profile: renderProfile };
+
+  function myOrders() { return DB.orders.filter(o => o.restaurantId === myRestaurant.id); }
+  function myMenuItems() { return DB.menus.filter(m => m.restaurantId === myRestaurant.id); }
+
+  function renderDashboard() {
+    const orders = myOrders();
+    const today = new Date().toISOString().split('T')[0];
+    const todayOrders = orders.filter(o => o.date === today);
+    const revenue = orders.filter(o => o.status === 'delivered').reduce((s, o) => s + o.total, 0);
+    const stats = [
+      { label: 'Menu Items', number: myMenuItems().length, icon: '🍽️' },
+      { label: 'Total Orders', number: orders.length, icon: '📋' },
+      { label: "Today's Orders", number: todayOrders.length, icon: '📅' },
+      { label: 'Revenue', number: '$' + revenue.toFixed(2), icon: '💰' }
+    ];
+    document.getElementById('mgStatsGrid').innerHTML = stats.map(s =>
+      `<div class="stat-card"><div class="number">${s.number}</div><div class="label">${s.icon} ${s.label}</div></div>`
+    ).join('');
+
+    const active = orders.filter(o => ['pending','preparing','ready'].includes(o.status));
+    document.getElementById('todayOrders').innerHTML = active.length ? active.map(o => {
+      const cust = DB.users.find(u => u.id === o.customerId);
+      const itemCount = o.items.reduce((s, i) => s + i.qty, 0);
+      return `<tr><td>#${o.id}</td><td>${cust?.name||'?'}</td><td>${itemCount} item(s)</td>
+        <td>$${o.total.toFixed(2)}</td>
+        <td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td>
+        <td><select onchange="updateStatus(${o.id}, this.value)" class="btn btn-sm">
+          ${['pending','preparing','ready','delivered','cancelled'].map(s =>
+            `<option value="${s}" ${o.status===s?'selected':''}>${s}</option>`).join('')}
+        </select></td></tr>`;
+    }).join('') : '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:20px">No active orders</td></tr>';
+  }
+
+  function renderMenu() {
+    document.getElementById('menuTable').innerHTML = myMenuItems().map(m =>
+      `<tr><td>${m.image} ${m.name}</td><td>${m.category}</td><td>$${m.price.toFixed(2)}</td>
+       <td><span class="badge ${m.available?'badge-success':'badge-danger'}">${m.available?'Yes':'No'}</span></td>
+       <td><button class="btn btn-warning btn-sm" onclick="editMenuItem(${m.id})">Edit</button>
+           <button class="btn btn-danger btn-sm" onclick="deleteMenuItem(${m.id})">Delete</button></td></tr>`
+    ).join('') || '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:20px">No menu items yet</td></tr>';
+  }
+
+  function renderOrders() {
+    const filter = document.getElementById('orderFilter')?.value || '';
+    let orders = myOrders();
+    if (filter) orders = orders.filter(o => o.status === filter);
+    document.getElementById('ordersTable').innerHTML = orders.length ? orders.reverse().map(o => {
+      const cust = DB.users.find(u => u.id === o.customerId);
+      const itemCount = o.items.reduce((s, i) => s + i.qty, 0);
+      return `<tr><td>#${o.id}</td><td>${cust?.name||'?'}</td><td>${itemCount} item(s)</td>
+        <td>$${o.total.toFixed(2)}</td>
+        <td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td>
+        <td>${o.date}</td>
+        <td><select onchange="updateStatus(${o.id}, this.value)" class="btn btn-sm">
+          ${['pending','preparing','ready','delivered','cancelled'].map(s =>
+            `<option value="${s}" ${o.status===s?'selected':''}>${s}</option>`).join('')}
+        </select></td></tr>`;
+    }).join('') : '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:20px">No orders found</td></tr>';
+  }
+
+  function renderProfile() {
+    document.getElementById('profName').value = myRestaurant.name;
+    document.getElementById('profCuisine').value = myRestaurant.cuisine;
+    document.getElementById('profAddress').value = myRestaurant.address;
+    document.getElementById('profStatus').value = myRestaurant.status;
+  }
+
+  function saveProfile() {
+    myRestaurant.name = document.getElementById('profName').value;
+    myRestaurant.cuisine = document.getElementById('profCuisine').value;
+    myRestaurant.address = document.getElementById('profAddress').value;
+    myRestaurant.status = document.getElementById('profStatus').value;
+    saveDB(); showToast('Profile updated');
+  }
+
+  function openMenuModal(id) {
+    document.getElementById('menuModalTitle').textContent = id ? 'Edit Item' : 'Add Menu Item';
+    document.getElementById('menuItemId').value = id || '';
+    if (id) {
+      const m = DB.menus.find(x => x.id === id);
+      document.getElementById('menuName').value = m.name;
+      document.getElementById('menuCategory').value = m.category;
+      document.getElementById('menuPrice').value = m.price;
+      document.getElementById('menuImage').value = m.image;
+      document.getElementById('menuAvailable').checked = m.available;
+    } else {
+      ['menuName','menuPrice','menuImage'].forEach(f => document.getElementById(f).value = '');
+      document.getElementById('menuAvailable').checked = true;
+    }
+    document.getElementById('menuModal').classList.add('open');
+  }
+
+  function saveMenuItem() {
+    const id = document.getElementById('menuItemId').value;
+    const data = {
+      name: document.getElementById('menuName').value,
+      category: document.getElementById('menuCategory').value,
+      price: parseFloat(document.getElementById('menuPrice').value),
+      image: document.getElementById('menuImage').value || '🍽️',
+      available: document.getElementById('menuAvailable').checked,
+      restaurantId: myRestaurant.id
+    };
+    if (!data.name || isNaN(data.price)) return showToast('Name and price required');
+    if (id) { Object.assign(DB.menus.find(x => x.id === parseInt(id)), data); }
+    else { DB.menus.push({ id: DB.nextId.menus++, ...data }); }
+    saveDB(); closeModal('menuModal'); renderMenu(); showToast('Menu item saved');
+  }
+
+  function editMenuItem(id) { openMenuModal(id); }
+  function deleteMenuItem(id) {
+    if (!confirm('Delete this item?')) return;
+    DB.menus = DB.menus.filter(m => m.id !== id);
+    saveDB(); renderMenu(); showToast('Deleted');
+  }
+
+  function updateStatus(id, status) {
+    const o = DB.orders.find(x => x.id === id);
+    if (o) { o.status = status; saveDB(); showToast('Status updated'); }
+  }
+
+  function statusBadge(s) {
+    return {pending:'badge-warning',preparing:'badge-info',ready:'badge-warning',delivered:'badge-success',cancelled:'badge-danger'}[s]||'badge-info';
+  }
+
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  renderDashboard();
+</script>
+</body>
+</html>
