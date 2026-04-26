@@ -13,7 +13,7 @@ function initGemini() {
   }
   genAI = new GoogleGenerativeAI(apiKey);
   embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
-  chatModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  chatModel = genAI.getGenerativeModel({ model: 'gemini-pro-latest' });
   console.log('✅ Gemini AI initialized');
   return true;
 }
