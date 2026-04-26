@@ -33,6 +33,18 @@ export default function MyOrders() {
     return badges[status] || 'badge'
   }
 
+  const getStatusLabel = (status) => {
+    const labels = {
+      pending: 'Pending',
+      confirmed: 'Confirmed',
+      preparing: 'Preparing 👨‍🍳',
+      ready: 'Ready for Pickup 🎉',
+      completed: 'Received ✓',
+      cancelled: 'Cancelled'
+    }
+    return labels[status] || status
+  }
+
   return (
     <div className="container" style={{ padding: '40px 20px' }}>
       <h1 style={{ fontSize: '28px', marginBottom: '32px' }}>My Orders</h1>
@@ -80,12 +92,12 @@ export default function MyOrders() {
 
               <div>
                 <div style={{ color: 'var(--gray)', fontSize: '13px' }}>Total</div>
-                <div style={{ fontWeight: '700', color: 'var(--primary)' }}>${order.total.toFixed(2)}</div>
+                <div style={{ fontWeight: '700', color: 'var(--primary)' }}>₹{order.total.toFixed(2)}</div>
               </div>
 
               <div>
                 <span className={`badge ${getStatusBadge(order.status)}`}>
-                  {order.status}
+                  {getStatusLabel(order.status)}
                 </span>
               </div>
             </Link>

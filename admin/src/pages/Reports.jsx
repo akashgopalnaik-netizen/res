@@ -55,7 +55,7 @@ export default function Reports() {
         <div className="stat-card">
           <div className="stat-card-header">
             <div>
-              <div className="stat-card-value">${paymentStats?.totalRevenue?.toFixed(2) || '0.00'}</div>
+              <div className="stat-card-value">₹{paymentStats?.totalRevenue?.toFixed(2) || '0.00'}</div>
               <div className="stat-card-label">Total Revenue</div>
             </div>
             <div className="stat-card-icon" style={{ background: '#d1fae5' }}>💰</div>
@@ -64,7 +64,7 @@ export default function Reports() {
         <div className="stat-card">
           <div className="stat-card-header">
             <div>
-              <div className="stat-card-value">${paymentStats?.todayRevenue?.toFixed(2) || '0.00'}</div>
+              <div className="stat-card-value">₹{paymentStats?.todayRevenue?.toFixed(2) || '0.00'}</div>
               <div className="stat-card-label">Today's Revenue</div>
             </div>
             <div className="stat-card-icon" style={{ background: '#dbeafe' }}>📊</div>
@@ -153,7 +153,7 @@ export default function Reports() {
               <tr key={payment.orderNumber}>
                 <td style={{ fontWeight: '600' }}>{payment.orderNumber}</td>
                 <td>{payment.customer}</td>
-                <td style={{ fontWeight: '600', color: 'var(--primary)' }}>${payment.amount.toFixed(2)}</td>
+                <td style={{ fontWeight: '600', color: 'var(--primary)' }}>₹{payment.amount.toFixed(2)}</td>
                 <td style={{ textTransform: 'capitalize' }}>{payment.method}</td>
                 <td>
                   <span className={`badge ${

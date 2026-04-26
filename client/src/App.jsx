@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import Header from './components/Header'
+import AIChat from './components/AIChat'
 import Home from './pages/Home'
 import Menu from './pages/Menu'
 import Cart from './pages/Cart'
@@ -41,8 +42,12 @@ function App() {
           <ProtectedRoute><Profile /></ProtectedRoute>
         } />
       </Routes>
+
+      {/* Global AI chat widget — visible on all pages */}
+      <AIChat />
     </>
   )
 }
 
 export default App
+

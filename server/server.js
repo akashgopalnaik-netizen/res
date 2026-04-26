@@ -9,6 +9,8 @@ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const connectDB = require('./config/db');
+const { initChroma } = require('./services/vectordb');
+const { initGemini } = require('./services/rag');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -20,6 +22,7 @@ const reservationRoutes = require('./routes/reservations');
 const inventoryRoutes = require('./routes/inventory');
 const paymentRoutes = require('./routes/payment');
 const dashboardRoutes = require('./routes/dashboard');
+const aiRoutes = require('./routes/ai');
 
 // Connect to MongoDB
 connectDB();
@@ -27,7 +30,7 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// Socket.io setup for real-time updates
+// Socket.io setup
 const io = new Server(server, {
   cors: {
     origin: [process.env.CLIENT_URL, process.env.ADMIN_URL],
@@ -36,7 +39,16 @@ const io = new Server(server, {
   }
 });
 
-// Middleware
+// ─── Stripe Webhook (must receive RAW body — BEFORE express.json()) ───────────
+app.post(
+  '/api/payment/webhook',
+  express.raw({ type: 'application/json' }),
+  require('./routes/payment').webhookHandler || ((req, res, next) => next())
+);
+// Note: The actual webhook handler is in routes/payment.js and mounted below.
+// The raw middleware above ensures req.body is a Buffer for signature verification.
+
+// ─── General middleware ───────────────────────────────────────────────────────
 app.use(helmet());
 app.use(cors({
   origin: [process.env.CLIENT_URL, process.env.ADMIN_URL],
@@ -50,11 +62,11 @@ app.use(express.urlencoded({ extended: true }));
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5000 // Increased from 100 to prevent 429 errors during dev/usage
+  max: 5000
 });
 app.use('/api/', limiter);
 
-// Routes
+// ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/menu', menuRoutes);
@@ -64,6 +76,7 @@ app.use('/api/reservations', reservationRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -79,7 +92,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Socket.io connection handling
+// ─── Socket.io ────────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
@@ -98,12 +111,16 @@ io.on('connection', (socket) => {
   });
 });
 
-// Make io accessible to routes
 app.set('io', io);
 
+// ─── Start server + init AI services ─────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+server.listen(PORT, async () => {
+  console.log(`\n🚀 Server running on port ${PORT}`);
+
+  // Init AI services (non-blocking — app runs fine without them)
+  await initChroma();
+  initGemini();
 });
 
 module.exports = { app, io };

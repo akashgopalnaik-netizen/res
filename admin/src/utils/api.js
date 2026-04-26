@@ -47,7 +47,8 @@ export const orderAPI = {
   updateStatus: (id, data) => api.put(`/orders/${id}/status`, data),
   update: (id, data) => api.put(`/orders/${id}`, data),
   cancel: (id) => api.delete(`/orders/${id}`),
-  getKitchenDisplay: () => api.get('/orders/kitchen/display')
+  getKitchenDisplay: () => api.get('/orders/kitchen/display'),
+  verifyToken: (id, token) => api.post(`/orders/${id}/verify-token`, { token })
 }
 
 export const menuAPI = {
@@ -104,6 +105,11 @@ export const paymentAPI = {
   getHistory: (params) => api.get('/payment/history', { params }),
   getStats: () => api.get('/payment/stats/overview'),
   refund: (data) => api.post('/payment/refund', data)
+}
+
+export const aiAPI = {
+  status: () => api.get('/ai/status'),
+  indexMenu: () => api.post('/ai/index-menu')
 }
 
 export default api

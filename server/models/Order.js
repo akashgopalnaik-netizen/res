@@ -89,7 +89,7 @@ const orderSchema = new mongoose.Schema({
   payment: {
     method: {
       type: String,
-      enum: ['cash_at_counter', 'cod', 'pending'],
+      enum: ['cash_at_counter', 'cod', 'stripe', 'cash', 'pending'],
       default: 'pending'
     },
     status: {
@@ -97,7 +97,7 @@ const orderSchema = new mongoose.Schema({
       enum: ['pending', 'completed', 'failed', 'refunded'],
       default: 'pending'
     },
-    transactionId: String,
+    transactionId: String,  // Stripe session/payment_intent ID
     stripePaymentId: String,
     paidAt: Date,
     amount: Number

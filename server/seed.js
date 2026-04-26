@@ -8,6 +8,8 @@ const User = require('./models/User');
 const MenuItem = require('./models/MenuItem');
 const Table = require('./models/Table');
 const { InventoryItem, Supplier } = require('./models/Inventory');
+const { initChroma, upsertMenuItem, getCount, buildDocText } = require('./services/vectordb');
+const { initGemini, getEmbedding } = require('./services/rag');
 
 const seedData = async () => {
   try {
@@ -225,7 +227,7 @@ const seedData = async () => {
       }
     ];
 
-    await MenuItem.insertMany(menuItems);
+    const createdMenuItems = await MenuItem.insertMany(menuItems);
     console.log('Created menu items...');
 
     // Create Tables
@@ -298,11 +300,39 @@ const seedData = async () => {
     await InventoryItem.insertMany(inventoryItems);
     console.log('Created inventory items...');
 
+    // ── Auto-index menu into ChromaDB ─────────────────────────────────────────
+    console.log('\n🔄 Attempting to index menu into ChromaDB...');
+    const chromaReady = await initChroma();
+    const geminiReady = initGemini();
+
+    if (chromaReady && geminiReady) {
+      let indexed = 0;
+      let failed = 0;
+      for (const item of createdMenuItems) {
+        try {
+          const docText = buildDocText(item);
+          const embedding = await getEmbedding(docText);
+          await upsertMenuItem(item, embedding);
+          indexed++;
+          process.stdout.write(`   Indexed ${indexed}/${createdMenuItems.length}: ${item.name}\r`);
+          await new Promise(r => setTimeout(r, 250)); // respect rate limits
+        } catch (err) {
+          failed++;
+          console.warn(`\n   ⚠️  Failed to index "${item.name}": ${err.message}`);
+        }
+      }
+      const total = await getCount();
+      console.log(`\n✅ ChromaDB indexing done — ${indexed} indexed, ${failed} failed (${total} total in collection)`);
+    } else {
+      console.log('⚠️  ChromaDB or Gemini not available — skipping auto-index.');
+      console.log('   To index later: POST /api/ai/index-menu (admin token required)');
+    }
+
     console.log('\n✅ Database seeded successfully!');
     console.log('\nLogin credentials:');
-    console.log('  Admin: admin@foodhub.com / admin123');
-    console.log('  Manager: manager@foodhub.com / manager123');
-    console.log('  Staff: staff@foodhub.com / staff123');
+    console.log('  Admin:    admin@foodhub.com    / admin123');
+    console.log('  Manager:  manager@foodhub.com  / manager123');
+    console.log('  Staff:    staff@foodhub.com    / staff123');
     console.log('  Customer: customer@example.com / customer123');
 
     process.exit(0);

@@ -100,7 +100,7 @@ export default function Home() {
                   <div className="menu-item-name">{item.name}</div>
                   <div className="menu-item-description">{item.description}</div>
                   <div className="menu-item-footer">
-                    <span className="menu-item-price">${item.price.toFixed(2)}</span>
+                    <span className="menu-item-price">₹{item.price.toFixed(2)}</span>
                     <span className="badge badge-primary">Featured</span>
                   </div>
                 </div>

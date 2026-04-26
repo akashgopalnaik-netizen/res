@@ -2,8 +2,30 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const MenuItem = require('../models/MenuItem');
 const { protect, authorize } = require('../middleware/auth');
+const { upsertMenuItem, deleteMenuItem, isConnected } = require('../services/vectordb');
+const { getEmbedding, isReady } = require('../services/rag');
 
 const router = express.Router();
+
+/** Helper: sync a menu item to ChromaDB (non-blocking, never throws) */
+async function syncToChroma(item) {
+  if (!isConnected() || !isReady()) return;
+  try {
+    const docText = [
+      `Name: ${item.name}`,
+      `Category: ${item.category}`,
+      `Description: ${item.description || ''}`,
+      `Price: $${item.price}`,
+      `Dietary: ${(item.dietaryInfo || []).join(', ') || 'none'}`,
+      `Status: ${item.isAvailable ? 'available' : 'unavailable'}`,
+      `Featured: ${item.isFeatured ? 'yes' : 'no'}`
+    ].join('. ');
+    const embedding = await getEmbedding(docText);
+    await upsertMenuItem(item, embedding);
+  } catch (err) {
+    console.warn('ChromaDB sync warning:', err.message);
+  }
+}
 
 // @route   GET /api/menu
 // @desc    Get all menu items (public with optional auth)
@@ -107,6 +129,10 @@ router.post('/', protect, authorize('admin', 'manager'), [
 
     try {
       const menuItem = await MenuItem.create(req.body);
+
+      // Async ChromaDB sync (non-blocking)
+      syncToChroma(menuItem);
+
       res.status(201).json({
         success: true,
         message: 'Menu item created successfully',
@@ -134,6 +160,9 @@ router.put('/:id', protect, authorize('admin', 'manager'), async (req, res) => {
       return res.status(404).json({ success: false, message: 'Menu item not found' });
     }
 
+    // Async ChromaDB sync
+    syncToChroma(menuItem);
+
     res.json({
       success: true,
       message: 'Menu item updated successfully',
@@ -159,6 +188,9 @@ router.delete('/:id', protect, authorize('admin', 'manager'), async (req, res) =
     if (!menuItem) {
       return res.status(404).json({ success: false, message: 'Menu item not found' });
     }
+
+    // Remove from ChromaDB index
+    deleteMenuItem(menuItem._id.toString());
 
     res.json({ success: true, message: 'Menu item removed successfully' });
   } catch (error) {

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.env.local
+chroma_data/
+*.log
+.vscode/
+.DS_Store

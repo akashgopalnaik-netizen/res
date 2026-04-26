@@ -74,10 +74,18 @@ export const reservationAPI = {
 
 // Payment APIs
 export const paymentAPI = {
-  createIntent: (data) => api.post('/payment/create-intent', data),
-  generateQR: (data) => api.post('/payment/qr-generate', data),
-  processQR: (data) => api.post('/payment/qr-pay', data),
-  payCash: (data) => api.post('/payment/cash', data)
+  createCheckoutSession: (data) => api.post('/payment/create-checkout-session', data),
+  payCash: (data) => api.post('/payment/cash', data),
+  getOrderPayment: (orderId) => api.get(`/payment/order/${orderId}`),
+  refund: (data) => api.post('/payment/refund', data)
+}
+
+// AI / RAG APIs
+export const aiAPI = {
+  chat: (data) => api.post('/ai/chat', data),
+  search: (data) => api.post('/ai/search', data),
+  status: () => api.get('/ai/status'),
+  indexMenu: () => api.post('/ai/index-menu')
 }
 
 // Table APIs

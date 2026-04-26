@@ -108,7 +108,7 @@ export default function Inventory() {
           <div className="stat-card">
             <div className="stat-card-header">
               <div>
-                <div className="stat-card-value">${stats.totalValue?.toFixed(2) || '0.00'}</div>
+                <div className="stat-card-value">₹{stats.totalValue?.toFixed(2) || '0.00'}</div>
                 <div className="stat-card-label">Total Value</div>
               </div>
               <div className="stat-card-icon" style={{ background: '#d1fae5' }}>💰</div>
@@ -178,8 +178,8 @@ export default function Inventory() {
                     <span style={{ fontWeight: '600' }}>{item.currentStock}</span> {item.unit}
                   </td>
                   <td>{item.minimumStock} {item.unit}</td>
-                  <td>${item.costPerUnit?.toFixed(2)}</td>
-                  <td>${(item.currentStock * item.costPerUnit)?.toFixed(2)}</td>
+                  <td>₹{item.costPerUnit?.toFixed(2)}</td>
+                  <td>₹{(item.currentStock * item.costPerUnit)?.toFixed(2)}</td>
                   <td>
                     <span className={`badge ${getStatusBadge(item.status)}`}>
                       {item.status}
@@ -298,7 +298,7 @@ export default function Inventory() {
                     </div>
                   </div>
                   <div className="input-group">
-                    <label>Cost Per Unit ($)</label>
+                    <label>Cost Per Unit (₹)</label>
                     <input
                       type="number"
                       step="0.01"
@@ -320,7 +320,7 @@ export default function Inventory() {
                     />
                   </div>
                   <div className="input-group">
-                    <label>Cost Per Unit ($)</label>
+                    <label>Cost Per Unit (₹)</label>
                     <input
                       type="number"
                       step="0.01"

@@ -227,7 +227,43 @@ router.put('/:id/status', protect, authorize('admin', 'manager', 'staff'), async
   }
 });
 
-// @route   PUT /api/orders/:id
+// @route   POST /api/orders/:id/verify-token
+// @desc    Verify customer pickup token — staff enters the token the customer shows
+// @access  Private/Staff
+router.post('/:id/verify-token', protect, authorize('admin', 'manager', 'staff'), async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token || !token.trim()) {
+      return res.status(400).json({ success: false, message: 'Token is required' });
+    }
+
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (order.status === 'completed') {
+      return res.status(400).json({ success: false, message: 'Order is already completed' });
+    }
+
+    if (order.status !== 'ready') {
+      return res.status(400).json({ success: false, message: 'Order is not ready for pickup yet' });
+    }
+
+    // Case-insensitive token comparison
+    if (!order.receiveToken || order.receiveToken.toUpperCase() !== token.trim().toUpperCase()) {
+      return res.status(400).json({ success: false, message: 'Invalid token. Please ask the customer to show their token again.' });
+    }
+
+    res.json({ success: true, message: 'Token verified successfully' });
+  } catch (error) {
+    console.error('Verify token error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+
 // @desc    Update order
 // @access  Private/Staff
 router.put('/:id', protect, authorize('admin', 'manager', 'staff'), async (req, res) => {

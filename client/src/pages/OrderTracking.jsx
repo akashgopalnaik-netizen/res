@@ -4,11 +4,11 @@ import { orderAPI } from '../utils/api'
 import { io } from 'socket.io-client'
 
 const statusSteps = [
-  { status: 'pending', label: 'Order Received', icon: '📋' },
+  { status: 'pending', label: 'Order Placed', icon: '📋' },
   { status: 'confirmed', label: 'Order Confirmed', icon: '✅' },
-  { status: 'preparing', label: 'Preparing', icon: '👨‍🍳' },
-  { status: 'ready', label: 'Ready for Pickup', icon: '🍽️' },
-  { status: 'completed', label: 'Completed', icon: '✨' }
+  { status: 'preparing', label: 'Being Prepared', icon: '👨‍🍳' },
+  { status: 'ready', label: 'Ready for Pickup!', icon: '🍽️' },
+  { status: 'completed', label: 'Order Received ✓', icon: '✨' }
 ]
 
 export default function OrderTracking() {
@@ -70,13 +70,39 @@ export default function OrderTracking() {
   const currentStepIndex = statusSteps.findIndex(s => s.status === order.status)
 
   return (
-    <div className="order-tracking">
+      <div className="order-tracking">
+      {/* Received celebration banner */}
+      {order.status === 'completed' && (
+        <div style={{
+          background: 'linear-gradient(135deg, #10b981, #059669)',
+          borderRadius: '16px', padding: '24px', marginBottom: '24px',
+          textAlign: 'center', boxShadow: '0 8px 32px rgba(16,185,129,0.3)'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '8px' }}>🎉</div>
+          <h2 style={{ color: '#fff', fontSize: '22px', fontWeight: 800, marginBottom: '6px' }}>Order Received!</h2>
+          <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '15px' }}>Thank you! Your order has been collected. Enjoy your meal!</p>
+        </div>
+      )}
+
+      {/* "Ready for pickup" alert banner */}
+      {order.status === 'ready' && (
+        <div style={{
+          background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+          borderRadius: '16px', padding: '20px', marginBottom: '24px',
+          textAlign: 'center', boxShadow: '0 8px 32px rgba(99,102,241,0.3)'
+        }}>
+          <div style={{ fontSize: '40px', marginBottom: '6px' }}>🛒</div>
+          <h2 style={{ color: '#fff', fontSize: '20px', fontWeight: 700, marginBottom: '4px' }}>Your order is ready!</h2>
+          <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '14px' }}>Please show your token to the staff to collect your order.</p>
+        </div>
+      )}
+
       <div className="order-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div className="order-number">{order.orderNumber}</div>
-          {order.receiveToken && (
+          {order.receiveToken && order.status !== 'completed' && (
             <div style={{ background: 'var(--primary)', color: 'white', padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold' }}>
-              Token: {order.receiveToken}
+              🎫 Token: {order.receiveToken}
             </div>
           )}
         </div>
@@ -94,7 +120,7 @@ export default function OrderTracking() {
           </div>
           <div>
             <div style={{ fontSize: '13px', color: 'var(--gray)' }}>Total</div>
-            <div style={{ fontWeight: '700', color: 'var(--primary)' }}>${order.total.toFixed(2)}</div>
+            <div style={{ fontWeight: '700', color: 'var(--primary)' }}>₹{order.total.toFixed(2)}</div>
           </div>
         </div>
       </div>
@@ -132,7 +158,7 @@ export default function OrderTracking() {
             borderBottom: idx < order.items.length - 1 ? '1px solid var(--border)' : 'none'
           }}>
             <span>{item.name} x {item.quantity}</span>
-            <span>${(item.price * item.quantity).toFixed(2)}</span>
+            <span>₹{(item.price * item.quantity).toFixed(2)}</span>
           </div>
         ))}
       </div>
