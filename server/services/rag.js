@@ -12,7 +12,7 @@ function initGemini() {
     return false;
   }
   genAI = new GoogleGenerativeAI(apiKey);
-  embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+  embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
   chatModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
   console.log('✅ Gemini AI initialized');
   return true;
